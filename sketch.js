@@ -1,152 +1,118 @@
-let pianoImg;
-let osc;
-let circles = [];
-let lastNote = null;
-let noteTimer = 0;
-
-const notes = {
-  "도": 261.63,
-  "도#": 277.18,
-  "레": 293.66,
-  "레#": 311.13,
-  "미": 329.63,
-  "파": 349.23,
-  "파#": 369.99,
-  "솔": 392.00,
-  "솔#": 415.30,
-  "라": 440.00,
-  "라#": 466.16,
-  "시": 493.88,
-  "도2": 523.25
-};
-
-const keyAreas = {
-  "도": [
-    {"x":0,"y":203,"w":51,"h":108},{"x":1,"y":0,"w":27,"h":200}
-  ],
-  "도#": [
-    {"x":28,"y":0,"w":37,"h":201}
-  ],
-  "레": [
-    {"x":52,"y":200,"w":55,"h":112}, {"x":62,"y":2,"w":32,"h":197}
-  ],
-  "레#": [
-    {"x":94,"y":0,"w":31,"h":197}
-  ],
-  "미": [
-    {"x":107,"y":200,"w":50,"h":111}, {"x":127,"y":1,"w":30,"h":199}
-  ],
-  "파": [
-    {"x":158,"y":201,"w":52,"h":110}, {"x":161,"y":1,"w":24,"h":199}
-  ],
-  "파#": [
-    {"x":187,"y":1,"w":33,"h":199}
-  ],
-  "솔": [
-    {"x":211,"y":201,"w":51,"h":108}, {"x":220,"y":3,"w":26,"h":196}
-  ],
-  "솔#": [
-    {"x":246,"y":0,"w":32,"h":197}
-  ],
-  "라": [
-    {"x":265,"y":200,"w":49,"h":112}, {"x":279,"y":3,"w":27,"h":196}
-  ],
-  "라#": [
-    {"x":307,"y":1,"w":32,"h":197}
-  ],
-  "시": [
-    {"x":317,"y":199,"w":51,"h":112}, {"x":339,"y":2,"w":29,"h":197}
-  ],
-  "도2": [
-    {"x":368,"y":199,"w":52,"h":112}, {"x":370,"y":1,"w":29,"h":197}
-  ]
-};
+let inputH, inputM, inputS;
+let button;
+let alarms = [];          
+let alarmButtons = []; 
+let alarmSound;
 
 function preload() {
-  pianoImg = loadImage("piano_image.jpg");
+  soundFormats('mp3', 'wav');
+  alarmSound = loadSound('Blue Valentine.mp3');
 }
 
 function setup() {
-  createCanvas(pianoImg.width, pianoImg.height);
-  osc = new p5.Oscillator('sine');
-  osc.amp(0);
-  osc.start();
+  createCanvas(400, 450);
+  textAlign(CENTER, CENTER);
+  textSize(18);
+
+  inputH = createInput();
+  inputH.position(100, 150);
+  inputH.size(50);
+  inputH.attribute('placeholder', '시');
+
+  inputM = createInput();
+  inputM.position(160, 150);
+  inputM.size(50);
+  inputM.attribute('placeholder', '분');
+
+  inputS = createInput();
+  inputS.position(220, 150);
+  inputS.size(50);
+  inputS.attribute('placeholder', '초');
+
+  button = createButton('알람 추가');
+  button.position(290, 150);
+  button.mousePressed(addAlarm);
+
+  userStartAudio();
 }
 
 function draw() {
-  background(255);
-  image(pianoImg, 0, 0, width, height);
+  background(240, 245, 255);
 
-  for (let i = circles.length - 1; i >= 0; i--) {
-    let c = circles[i];
-    drawGradientCircle(c.x, c.y, 20, c.life);
-    c.life--;
-    if (c.life <= 0) circles.splice(i, 1);
-  }
+  fill(70, 80, 120);
+  textSize(28);
+  text("⏰ 알람 시계", width / 2, 40);
 
-  if (lastNote && frameCount - noteTimer < 60) {
-    fill(180, 100, 255);
-    textSize(28);
-    textAlign(CENTER, TOP);
-    text(lastNote, width / 2, 10);
-  }
-}
+  let h = hour();
+  let m = minute();
+  let s = second();
+  fill(40);
+  textSize(24);
+  text(`${nf(h, 2)} : ${nf(m, 2)} : ${nf(s, 2)}`, width / 2, 90);
 
-function mousePressed() {
-  let noteName = getClickedNote(mouseX, mouseY);
-  if (noteName) {
-    playNote(noteName);
-    circles.push({ x: mouseX, y: mouseY, life: 30 });
-    lastNote = noteName;
-    noteTimer = frameCount;
-    console.log(`눌린 음: ${noteName}`);
-  }
-}
+  fill(80, 90, 130);
+  textSize(20);
+  text("📝 등록된 알람", width / 2, 210);
 
-function mouseReleased() {
-  stopNote();
-}
+  fill(50);
+  textSize(18);
 
-function getClickedNote(x, y) {
-  const blackKeys = ["도#","레#","파#","솔#","라#"];
-  
-  for (let key of blackKeys) {
-    for (let area of keyAreas[key]) {
-      if (x > area.x && x < area.x + area.w && y > area.y && y < area.y + area.h) {
-        return key;
+  if (alarms.length === 0) {
+    text("아직 알람이 없습니다.", width / 2, 240);
+  } else {
+    for (let i = 0; i < alarms.length; i++) {
+      let a = alarms[i];
+
+      text(
+        `${i + 1}. ${nf(a.h, 2)}:${nf(a.m, 2)}:${nf(a.s, 2)}`,
+        150,
+        240 + i * 30
+      );
+
+      if (h === a.h && m === a.m && s === a.s) {
+        if (!alarmSound.isPlaying()) {
+          alarmSound.play();
+        }
+      }
+
+    
+      let btn = alarmButtons[i];
+      if (btn) {
+        btn.position(250, 232 + i * 30);
       }
     }
   }
-
-  for (let key in keyAreas) {
-    if (blackKeys.includes(key)) continue;
-    for (let area of keyAreas[key]) {
-      if (x > area.x && x < area.x + area.w && y > area.y && y < area.y + area.h) {
-        return key;
-      }
-    }
-  }
-  return null;
 }
 
-function playNote(noteName) {
-  let freq = notes[noteName];
-  if (freq) {
-    osc.freq(freq);
-    osc.amp(0.5, 0.05);
+function addAlarm() {
+  let h = int(inputH.value());
+  let m = int(inputM.value());
+  let s = int(inputS.value());
+
+  if (isNaN(h) || isNaN(m) || isNaN(s)) {
+    alert("시 / 분 / 초를 숫자로 입력하세요!");
+    return;
   }
+
+  alarms.push({ h: h, m: m, s: s });
+
+  let index = alarms.length - 1;
+  let btn = createButton("끄기");
+  btn.mousePressed(() => removeAlarm(index)); 
+  alarmButtons.push(btn);
+
+  console.log(`알람 추가됨 → ${h}시 ${m}분 ${s}초`);
 }
 
-function stopNote() {
-  osc.amp(0, 0.2);
-}
-
-function drawGradientCircle(x, y, r, life) {
-  noFill();
-  for (let i = r; i > 0; i--) {
-    let alpha = map(i, 0, r, 255, 30);
-    alpha *= (life / 30);
-    stroke(150, alpha);
-    circle(x, y, i * 2);
+function removeAlarm(index) {
+  if (alarmSound.isPlaying()) {
+    alarmSound.stop();
   }
+
+  alarms.splice(index, 1);
+
+  alarmButtons[index].remove();
+  alarmButtons.splice(index, 1);
+
+  console.log(`알람 ${index + 1}번 삭제됨 (소리도 정지됨)`);
 }
